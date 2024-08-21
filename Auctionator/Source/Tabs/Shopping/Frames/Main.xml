@@ -79,6 +79,11 @@
           <Anchor point="BOTTOMLEFT" relativeKey="$parent.MoreButton" relativePoint="BOTTOMRIGHT" x="5"/>
         </Anchors>
       </Button>
+      <Button parentKey="SearchAutoButton" inherits="UIPanelDynamicResizeButtonTemplate" text="AUCTIONATOR_L_SEARCH_AUTO">
+        <Anchors>
+          <Anchor point="BOTTOMLEFT" relativeKey="$parent.AddToListButton" relativePoint="BOTTOMRIGHT" x="5"/>
+        </Anchors>
+      </Button>
     </Frames>
   </Frame>
 
@@ -230,6 +235,15 @@
         </Anchors>
         <Scripts>
           <OnClick>self:GetParent():ExportCSVClicked()</OnClick>
+        </Scripts>
+      </Button>
+      <Button inherits="UIPanelDynamicResizeButtonTemplate" text="AUCTIONATOR_L_BUY_KILLER" parentKey="BuyKiller"  hidden="true">
+        <Anchors>
+          <Anchor point="TOP" relativeKey="$parent.ResultsListing" relativePoint="BOTTOM"/>
+          <Anchor point="RIGHT" relativePoint="RIGHT" x="-120" y="10" />
+        </Anchors>
+        <Scripts>
+          <OnClick>self:GetParent():BuyKillerClicked()</OnClick>
         </Scripts>
       </Button>
     </Frames>

@@ -1,5 +1,19 @@
 AuctionatorShoppingTabFrameMixin = {}
 
+AutoKillerConfig = {}
+AutoKillerConfig["银矿石"] = 48000
+--AutoKillerConfig["银矿石"] = 50000
+AutoKillerConfig["铜矿石"] = 2000
+AutoKillerConfig["锡矿石"] = 7000
+AutoKillerConfig["钴矿石"] = 10100
+
+AutoCurrentIndex = 1
+
+IsSearchAuto = false
+SearchAutoTimer = nil
+
+KillDatas = nil
+
 local EVENTBUS_EVENTS = {
   Auctionator.Shopping.Events.ListImportFinished,
   Auctionator.Shopping.Tab.Events.ListSearchRequested,
@@ -7,6 +21,17 @@ local EVENTBUS_EVENTS = {
   Auctionator.Shopping.Tab.Events.UpdateSearchTerm,
   Auctionator.Shopping.Tab.Events.BuyScreenShown,
 }
+
+local function TableLength(t)
+  if t == nil then
+    return 0
+  end
+  local res=0
+  for k,v in pairs(t) do
+      res=res+1
+  end
+  return res
+end
 
 function AuctionatorShoppingTabFrameMixin:DoSearch(terms, options)
   if #terms == 0 then
@@ -109,6 +134,11 @@ function AuctionatorShoppingTabFrameMixin:SetupSearchProvider()
       self.ListsContainer.SpinnerAnim:Stop()
       self.ListsContainer.LoadingSpinner:Hide()
       self.ListsContainer.ResultsText:Hide()
+      if TableLength(KillDatas) > 0 then
+        self.BuyKiller:Show()
+      else
+        self.BuyKiller:Hide()
+      end
     end,
     function(current, total, partialResults)
       Auctionator.EventBus:Fire(self, Auctionator.Shopping.Tab.Events.SearchIncrementalUpdate, partialResults, total, current)
@@ -198,8 +228,64 @@ function AuctionatorShoppingTabFrameMixin:SetupRecentsContainer()
   end)
 end
 
+
+
+
+function AuctionatorShoppingTabFrameMixin:BeginSearchAuto(searchTerm)
+
+  if self.searchRunning then
+    --print("searchRunning exit....")
+    return
+  end
+
+  if KillDatas ~=nil and TableLength(KillDatas) > 0 then
+    Auctionator.Debug.Message("还有数据没有秒杀完......")
+    self.BuyKiller:Show()
+    return
+  else
+    self.BuyKiller:Hide()
+  end
+
+  --AutoConfig = {}
+  --AutoConfig["银矿石"] = 40000
+
+  --{"铜矿石", 5000},
+  --{"锡矿石", 9000}
+
+  local i = 1
+  for k,v in pairs(AutoKillerConfig) do
+    --local otpions = {}
+    --otpions[k] = v
+
+    if i == AutoCurrentIndex then
+      k = "\"" .. k .. "\""
+      Auctionator.Debug.Message("searching ", k, v)
+      --print("searching ", k, v)
+      self.singleSearch = true
+      self:DoSearch({k})
+      self.SearchOptions:SetSearchTerm(k)
+      --break
+    end
+
+    i = i + 1
+  end
+
+  AutoCurrentIndex = AutoCurrentIndex + 1
+  if AutoCurrentIndex >= i then
+    AutoCurrentIndex = 1
+  end
+
+  --print("BeginSearchAuto exit...", AutoCurrentIndex)
+
+end
+
 function AuctionatorShoppingTabFrameMixin:SetupTopSearch()
   self.SearchOptions:SetOnSearch(function(searchTerm)
+    --searchTerm = "银矿石lala"
+    IsSearchAuto = false
+
+    self:ClearAutoKiller()
+
     if self.searchRunning then
       self:StopSearch()
     elseif searchTerm == "" and self.ListsContainer:GetExpandedList() ~= nil then
@@ -209,6 +295,22 @@ function AuctionatorShoppingTabFrameMixin:SetupTopSearch()
       self:DoSearch({searchTerm})
       Auctionator.Shopping.Recents.Save(searchTerm)
     end
+  end)
+  self.SearchOptions:SetOnSearchAuto(function(searchTerm)
+    IsSearchAuto = true
+    if SearchAutoTimer == nil then
+      SearchAutoTimer = C_Timer.NewTicker(3, function()
+        self:BeginSearchAuto(searchTerm)
+      end, 3600 * 24 * 30)
+    else
+      self:ClearAutoKiller()
+      --print("searchAutoTimer status", SearchAutoTimer:IsCancelled())
+    end
+    --C_Timer.NewTicker(1, function() print(GetTime()) end, 4)
+
+    -- C_Timer.After(0, function()
+    --  self:BeginSearchAuto(searchTerm)
+    -- end)
   end)
   self.SearchOptions:SetOnMore(function(searchTerm)
     self:CloseAnyDialogs()
@@ -261,12 +363,22 @@ function AuctionatorShoppingTabFrameMixin:ReceiveEvent(eventName, eventData)
   end
 end
 
+function AuctionatorShoppingTabFrameMixin:ClearAutoKiller()
+  if SearchAutoTimer ~= nil then
+    SearchAutoTimer:Cancel()
+    SearchAutoTimer = nil
+  end
+  KillDatas = {}
+  self.BuyKiller:Hide()
+end
+
 function AuctionatorShoppingTabFrameMixin:OnEvent(eventName, ...)
   if eventName == "PLAYER_INTERACTION_MANAGER_FRAME_HIDE" then
     local showType = ...
     if showType == Enum.PlayerInteractionType.Auctioneer then
       self.shouldDefaultOpenOnShow = true
     end
+    self:ClearAutoKiller()
   elseif eventName == "AUCTION_HOUSE_CLOSED" then
     self.shouldDefaultOpenOnShow = true
   end
@@ -286,6 +398,7 @@ function AuctionatorShoppingTabFrameMixin:OnHide()
   if self.searchRunning then
     self:StopSearch()
   end
+
   Auctionator.EventBus:Unregister(self, EVENTBUS_EVENTS)
 end
 
@@ -295,6 +408,46 @@ function AuctionatorShoppingTabFrameMixin:ExportCSVClicked()
     self.exportCSVDialog:SetExportString(result)
     self.exportCSVDialog:Show()
   end)
+end
+
+function AuctionatorShoppingTabFrameMixin:BuyKillerClicked()
+  self:CloseAnyDialogs()
+  if KillDatas == nil or TableLength(KillDatas) == 0 then
+    Auctionator.Debug.Message("没有秒杀数据。。。。。。", TableLength(KillDatas))
+    return
+  end
+
+  local LeftMoney = GetMoney()
+  if LeftMoney<= 50000 then
+    Auctionator.Debug.Message("口袋里只有这么一点钱了", LeftMoney)
+    return
+  end
+
+  if not Auctionator.AH.IsNotThrottled() then
+    Auctionator.Debug.Message("拍卖限流，请求过于频繁，请稍后再试")
+    return
+  end
+
+  for index,v in pairs(KillDatas) do
+    local stackPrice = v[Auctionator.Constants.AuctionItemInfo.Buyout]
+    if stackPrice > GetMoney() then
+      KillDatas[index] = nil
+      Auctionator.Debug.Message("口袋里没有钱花了!!!")
+    else
+      --Auctionator.AH.PlaceAuctionBid(index, stackPrice)
+      print("正在秒杀",index, v[1], v[Auctionator.Constants.AuctionItemInfo.Owner], "总价:", stackPrice, "单价:", v[Auctionator.Constants.AuctionItemInfo.Buyout] / v[Auctionator.Constants.AuctionItemInfo.Quantity])
+      PlaceAuctionBid("list", index, stackPrice)
+      KillDatas[index] = nil
+      break
+    end
+  end
+
+  local LeftDataLen = TableLength(KillDatas)
+  Auctionator.Debug.Message("还剩下秒杀的数量", LeftDataLen)
+  if LeftDataLen == 0 then
+    self.BuyKiller:Hide()
+  end
+
 end
 
 function AuctionatorShoppingTabFrameMixin:OpenDefaultList()

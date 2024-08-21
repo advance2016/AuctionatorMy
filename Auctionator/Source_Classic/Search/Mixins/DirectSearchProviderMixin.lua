@@ -116,6 +116,65 @@ function AuctionatorDirectSearchProviderMixin:GetCurrentEmptyResult()
   return r
 end
 
+local function KillGetOwned(entry)
+
+  if entry.info[Auctionator.Constants.AuctionItemInfo.Owner] == (GetUnitName("player")) then
+    return true
+  end
+
+  return false
+end
+
+
+function AuctionatorDirectSearchProviderMixin:AutoKiller()
+  if not IsSearchAuto then
+    Auctionator.Debug.Message("normal search")
+    return
+  end
+
+  --遍历表的键值对
+  -- for k,v in pairs(AutoKillerConfig) do
+  --  print("AutoKillerConfig:", k, v)
+  --end
+
+  for key, entries in pairs(self.resultsByKey) do
+    for index, entry in ipairs(entries) do
+      local isOwnerItem = KillGetOwned(entry)
+      if not isOwnerItem then
+        
+        local killprice = AutoKillerConfig[entry.info[1]]
+        if killprice ~= nil and killprice > 0 then
+          local buyout = GetPrice(entry)
+          if buyout ~= 0 and buyout <= killprice then
+
+            if KillDatas == nil then
+              KillDatas = {}
+            end
+
+            KillDatas[index] = entry.info
+
+            --[[
+            local stackPrice = entry.info[Auctionator.Constants.AuctionItemInfo.Buyout]
+            if stackPrice > GetMoney() then
+              print("口袋里没有钱花了!!!")
+            else
+              -- if Auctionator.AH.IsNotThrottled() then
+              if true then
+                --Auctionator.AH.PlaceAuctionBid(index, stackPrice)
+                PlaceAuctionBid("list", index, stackPrice)
+                print(entry.info[1], entry.info[Auctionator.Constants.AuctionItemInfo.Owner], "===", index, GetPrice(entry))
+              else
+                print("拍卖限流，请求过于频繁，请稍后再试")
+              end
+            end
+            ]]
+          end
+        end
+      end
+    end
+  end
+end
+
 function AuctionatorDirectSearchProviderMixin:AddFinalResults()
   local results = {}
   local waiting = #(Auctionator.Utilities.TableKeys(self.resultsByKey))
@@ -132,6 +191,8 @@ function AuctionatorDirectSearchProviderMixin:AddFinalResults()
     Auctionator.Search.GroupResultsForDB(self.individualResults)
     self:AddResults(results)
   end
+
+  self:AutoKiller()
 
   for key, entries in pairs(self.resultsByKey) do
     local minPrice = GetMinPrice(entries)

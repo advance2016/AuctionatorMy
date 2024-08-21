@@ -1,5 +1,6 @@
 function Auctionator.Debug.IsOn()
   return Auctionator.Config.Get(Auctionator.Config.Options.DEBUG)
+  --return true
 end
 
 function Auctionator.Debug.Toggle()

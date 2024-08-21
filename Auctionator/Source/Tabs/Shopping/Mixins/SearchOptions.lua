@@ -23,6 +23,17 @@ function AuctionatorShoppingTabSearchOptionsMixin:OnLoad()
     end
   end)
 
+  self.SearchAutoButton:SetScript("OnClick", function()
+    if self.onSearchAuto then
+      if SearchAutoTimer == nil then
+        self.SearchAutoButton:SetText(AUCTIONATOR_L_SEARCH_STOP_AUTO)
+      else
+        self.SearchAutoButton:SetText(AUCTIONATOR_L_SEARCH_AUTO)
+      end
+      self.onSearchAuto(self:GetSearchTerm())
+    end
+  end)
+
   Auctionator.EventBus:Register(self, {
     Auctionator.Shopping.Tab.Events.SearchStart,
     Auctionator.Shopping.Tab.Events.SearchEnd,
@@ -100,6 +111,10 @@ function AuctionatorShoppingTabSearchOptionsMixin:SetOnSearch(func)
   self.onSearch = func
 end
 
+function AuctionatorShoppingTabSearchOptionsMixin:SetOnSearchAuto(func)
+  self.onSearchAuto = func
+end
+
 function AuctionatorShoppingTabSearchOptionsMixin:SetOnMore(func)
   self.onMore = func
 end
@@ -126,6 +141,7 @@ end
 function AuctionatorShoppingTabSearchOptionsMixin:SetSearchTerm(searchTerm)
   self.lastSearchTerm = searchTerm
   self.SearchString:SetText(GetAppropriateText(searchTerm))
+  self.SearchString:ClearFocus()
 end
 
 function AuctionatorShoppingTabSearchOptionsMixin:GetSearchTerm()
